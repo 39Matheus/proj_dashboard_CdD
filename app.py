@@ -1,3 +1,5 @@
+!pip install gdown
+import gdown
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -8,17 +10,17 @@ import re
 from html import unescape
 from sklearn.preprocessing import MultiLabelBinarizer
 
+file_id = "1uF1nhyZ7ghk9flT2uuCgTRz70gCMpyx0"
+url = f"https://drive.google.com/uc?id={file_id}"
+
+
 st.set_page_config(layout="wide", page_title="Análise de Jogos Steam")
 st.title("🎮 Dashboard de Análise de Jogos da Steam")
 
-# Upload ou leitura direta
-uploaded_file = st.file_uploader("📁 Envie o arquivo games.json", type="json")
-if uploaded_file:
-    DATA = pd.read_json(uploaded_file).transpose().rename_axis('AppID').reset_index()
-else:
-    st.warning("Envie um arquivo JSON com os dados dos jogos extraídos da Steam.")
-    st.stop()
+output = "games.json"
+gdown.download(url, output, quiet=False)
 
+DATA = pd.read_json(output).transpose().rename_axis('AppID').reset_index()
 # Seleção de colunas úteis
 filtro_col = ['name', 'release_date', 'price', 'dlc_count', 'windows', 'mac', 'linux',
               'achievements', 'supported_languages', 'developers', 'publishers',
