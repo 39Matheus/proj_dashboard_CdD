@@ -8,11 +8,11 @@ from html import unescape
 import gdown
 from sklearn.preprocessing import MultiLabelBinarizer
 
-# Baixar arquivo do Google Drive
-file_id = "1uF1nhyZ7ghk9flT2uuCgTRz70gCMpyx0"
-url = f"https://drive.google.com/uc?id={file_id}"
-output = "games.json"
-gdown.download(url, output, quiet=False)
+# URL raw do arquivo JSON no repositório GitHub
+url = "https://raw.githubusercontent.com/39Matheus/proj_dashboard_CdD/main/games_reduzido.json"
+
+# Leitura dos dados direto do GitHub
+DATA = pd.read_json(url).transpose().rename_axis('AppID').reset_index()
 
 # Configuração da página
 st.set_page_config(layout="wide", page_title="Análise de Jogos Steam")
