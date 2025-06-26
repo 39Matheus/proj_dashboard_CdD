@@ -1,0 +1,154 @@
+# Earliest Version: Just trying to get it off collab
+# Setup
+from google.colab import drive
+drive.mount('/content/drive')
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
+import re
+from html import unescape
+from collections import defaultdict
+import matplotlib.dates as mdates
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures, MultiLabelBinarizer
+
+# Carregamento
+path = '/content/drive/MyDrive/Ciência de Dados/games.json'
+df = pd.read_json(path)
+df_backup = df.copy()
+df = df.transpose()
+df = df.rename_axis('AppID').reset_index().reset_index(drop=True)
+pd.set_option("display.max_rows", 50, "display.max_columns", 50)
+
+# Zeros e nulos
+for col in df.columns:
+    zeros = (df[col] == 0).sum()
+    nulls = df[col].isnull().sum()
+    print(f"Coluna '{col}': Zeros={zeros}, Nulos={nulls}")
+
+# Filtro de colunas relevantes
+filtro_col = ['name', 'release_date', 'price', 'dlc_count', 'windows', 'mac', 'linux', 'achievements', 'supported_languages', 'developers', 'publishers', 'categories', 'genres', 'positive', 'negative', 'estimated_owners', 'tags']
+df_1 = df[filtro_col]
+if 'reviews' not in df_1.columns:
+    df_1.insert(df_1.columns.get_loc('negative') + 1, 'reviews', df_1['positive'] + df_1['negative'])
+
+# Contadores
+def count_items_in_list_column(df, column_name):
+    counts = {}
+    for entry in df[column_name]:
+        if isinstance(entry, list):
+            for item in entry:
+                item = item.strip()
+                counts[item] = counts.get(item, 0) + 1
+    return counts
+
+def count_items_in_dict_column(df, column_name):
+    counts = {}
+    for entry in df[column_name]:
+        if isinstance(entry, dict):
+            for key in entry:
+                key = key.strip()
+                counts[key] = counts.get(key, 0) + 1
+    return counts
+
+genre_counts = count_items_in_list_column(df_1, 'genres')
+adjusted_genre_counts = defaultdict(int)
+for genre, count in genre_counts.items():
+    standardized_genre = genre.lower()
+    adjusted_genre_counts[standardized_genre] += count
+free_to_play = [key for key in adjusted_genre_counts if 'free to play' in key]
+if len(free_to_play) > 1:
+    free_to_play.sort(key=lambda k: adjusted_genre_counts[k], reverse=True)
+    for k in free_to_play[1:]:
+        del adjusted_genre_counts[k]
+
+categories_counts = count_items_in_list_column(df_1, 'categories')
+
+# Normalização de idiomas
+normalization_map = {
+    "Slovakian": "Slovak", "English (full audio)": "English", "Japanese (all with full audio support)": "Japanese",
+    "Traditional Chinese (text only)": "Traditional Chinese", "English Dutch  English": "English", "Portuguese - Portugal": "Portuguese"
+}
+supported_languages_counts = {}
+for entry in df_1['supported_languages']:
+    if isinstance(entry, list):
+        raw_languages = entry
+    elif isinstance(entry, str):
+        raw_languages = entry.split(',')
+    else:
+        continue
+    normalized_langs_in_row = set()
+    for raw_lang in raw_languages:
+        lang = unescape(raw_lang).strip()
+        lang = re.sub(r'\[/?b\]', '', lang)
+        lang = re.sub(r'<.*?>', '', lang)
+        lang = lang.replace(';', '').strip()
+        split_langs = re.split(r'[,\n]+', lang)
+        for sub_lang in split_langs:
+            sub_lang = sub_lang.strip()
+            if not sub_lang or '#' in sub_lang or '/' in sub_lang or 'lang_' in sub_lang:
+                continue
+            normalized_lang = normalization_map.get(sub_lang, sub_lang)
+            normalized_langs_in_row.add(normalized_lang)
+    for lang in normalized_langs_in_row:
+        supported_languages_counts[lang] = supported_languages_counts.get(lang, 0) + 1
+
+tags_counts = count_items_in_dict_column(df_1, 'tags')
+
+# Visualização
+language_palette = {
+    "English": "#061cd4", "Simplified Chinese": "#d62728", "German": "#ff7f0e", "French": "#009ee8",
+    "Russian": "#a00330", "Spanish - Spain": "#e8da00", "Japanese": "#ffbac6", "Italian": "#00b62f",
+    "Korean": "#5556ab", "Traditional Chinese": "#7f7f7f", "Portuguese - Brazil": "#138425", "Polish": "#e156c0"
+}
+steam_colors = sns.dark_palette("#69d", reverse=True, as_cmap=False, n_colors=12)
+genre_df = pd.DataFrame(list(genre_counts.items()), columns=['Genre', 'Count']).sort_values(by='Count', ascending=False).head(12)
+categories_df = pd.DataFrame(list(categories_counts.items()), columns=['Category', 'Count']).sort_values(by='Count', ascending=False).head(12)
+lang_df = pd.DataFrame(list(supported_languages_counts.items()), columns=['Language', 'Count']).sort_values(by='Count', ascending=False).head(12)
+tags_df = pd.DataFrame(list(tags_counts.items()), columns=['Tags', 'Count']).sort_values(by='Count', ascending=False).head(12)
+
+fig, axes = plt.subplots(4, 1, figsize=(18, 26))
+def add_labels(ax): [ax.bar_label(c, fmt='%d', label_type='edge', padding=3) for c in ax.containers]
+sns.barplot(ax=axes[0], x='Genre', y='Count', hue='Genre', data=genre_df, palette=steam_colors, legend=False)
+axes[0].set_title('Top 12 Gêneros'); axes[0].tick_params(axis='x', rotation=45); add_labels(axes[0])
+sns.barplot(ax=axes[1], x='Category', y='Count', hue='Category', data=categories_df, palette='hls', legend=False)
+axes[1].set_title('Top 12 Categorias'); axes[1].tick_params(axis='x', rotation=45); add_labels(axes[1])
+sns.barplot(ax=axes[2], x='Language', y='Count', hue='Language', data=lang_df, palette=language_palette, legend=False)
+axes[2].set_title('Top 12 Idiomas'); axes[2].tick_params(axis='x', rotation=45); add_labels(axes[2])
+sns.barplot(ax=axes[3], x='Tags', y='Count', hue='Tags', data=tags_df, palette='husl', legend=False)
+axes[3].set_title('Top 12 Tags'); axes[3].tick_params(axis='x', rotation=45); add_labels(axes[3])
+plt.tight_layout(); plt.show()
+
+# Sistema Operacional
+os_qtd_df = df_1[['windows', 'mac', 'linux']].sum().reset_index()
+os_qtd_df.columns = ['Sistema Operacional', 'Número de Jogos']
+plt.figure(figsize=(4, 6))
+ax = sns.barplot(data=os_qtd_df, x='Sistema Operacional', y='Número de Jogos',
+                 hue='Sistema Operacional', palette=['#01234f', '#585858', 'black'], width=0.5, legend=False)
+plt.title('Quantidade de jogos por sistema operacional'); add_labels(ax); plt.tight_layout(); plt.show()
+
+# Aprovação
+df_analises = df_1[['positive', 'negative', 'reviews']].copy()
+df_analises['approval'] = df_analises.apply(lambda row: row['positive'] / row['reviews'] if row['reviews'] else np.nan, axis=1)
+df_analises = df_analises.dropna(subset=['approval'])
+sns.histplot(df_analises['approval'], bins=30, kde=True, color='#01234f')
+plt.title('Distribuição da Taxa de Aprovação dos Jogos'); plt.grid(True); plt.tight_layout(); plt.show()
+df_analises = df_analises[df_analises['reviews'] >= 10]
+sns.histplot(df_analises['approval'], bins=30, kde=True, color='#01234f')
+plt.title('Distribuição da Taxa de Aprovação (mín. 10 avaliações)'); plt.grid(True); plt.tight_layout(); plt.show()
+
+# Lançamentos por mês
+release_dates = pd.to_datetime(df_1['release_date'], errors='coerce')
+release_month_numbers = release_dates.dt.month
+meses_pt = {1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril', 5: 'Maio', 6: 'Junho',
+            7: 'Julho', 8: 'Agosto', 9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'}
+lancamentos_por_mes = release_month_numbers.value_counts().sort_index()
+df_lancamentos = lancamentos_por_mes.rename(index=meses_pt).reset_index()
+df_lancamentos.columns = ['Mês', 'Quantidade']
+df_lancamentos['Mês'] = pd.Categorical(df_lancamentos['Mês'], categories=meses_pt.values(), ordered=True)
+df_lancamentos.sort_values('Mês', inplace=True)
+sns.barplot(data=df_lancamentos, x='Mês', y='Quantidade', palette='mako')
+plt.title('Quantidade de Jogos Lançados por Mês'); plt.xticks(rotation=45); plt.tight_layout(); plt.show()
