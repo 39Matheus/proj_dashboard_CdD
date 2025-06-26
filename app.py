@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -12,6 +11,7 @@ from sklearn.preprocessing import MultiLabelBinarizer
 st.set_page_config(layout="wide", page_title="Análise de Jogos Steam")
 st.title("🎮 Dashboard de Análise de Jogos da Steam")
 
+# Upload ou leitura direta
 uploaded_file = st.file_uploader("📁 Envie o arquivo games.json", type="json")
 if uploaded_file:
     DATA = pd.read_json(uploaded_file).transpose().rename_axis('AppID').reset_index()
@@ -19,14 +19,17 @@ else:
     st.warning("Envie um arquivo JSON com os dados dos jogos extraídos da Steam.")
     st.stop()
 
+# Seleção de colunas úteis
 filtro_col = ['name', 'release_date', 'price', 'dlc_count', 'windows', 'mac', 'linux',
               'achievements', 'supported_languages', 'developers', 'publishers',
               'categories', 'genres', 'positive', 'negative', 'estimated_owners', 'tags']
 df_1 = DATA[filtro_col].copy()
 
+# Cria coluna de reviews se ainda não existir
 if 'reviews' not in df_1.columns:
     df_1.insert(df_1.columns.get_loc('negative') + 1, 'reviews', df_1['positive'] + df_1['negative'])
 
+# Normalização de idiomas
 normalization_map = {
     "Slovakian": "Slovak",
     "English (full audio)": "English",
@@ -35,6 +38,7 @@ normalization_map = {
     "English Dutch  English": "English",
     "Portuguese - Portugal": "Portuguese",
 }
+
 def normalize_languages(entry):
     if isinstance(entry, list):
         raw = entry
@@ -42,13 +46,13 @@ def normalize_languages(entry):
         raw = entry.split(',')
     else:
         return []
+
     langs = set()
     for item in raw:
         item = unescape(item)
         item = re.sub(r'\[/?b\]|<.*?>|&lt;.*?&gt;', '', item)
         item = item.replace(';', '').strip()
-        for sub_lang in re.split(r'[,
-]+', item):
+        for sub_lang in re.split(r'[,\n]+', item):
             sub_lang = sub_lang.strip()
             if sub_lang and '#' not in sub_lang and '/' not in sub_lang:
                 langs.add(normalization_map.get(sub_lang, sub_lang))
@@ -56,6 +60,7 @@ def normalize_languages(entry):
 
 df_1['supported_languages'] = df_1['supported_languages'].apply(normalize_languages)
 
+# Função para contar categorias/gêneros/etc
 def count_items(df, col):
     counts = defaultdict(int)
     for row in df[col]:
@@ -64,6 +69,7 @@ def count_items(df, col):
                 counts[item.lower()] += 1
     return pd.DataFrame(counts.items(), columns=[col.capitalize(), 'Count']).sort_values('Count', ascending=False)
 
+# Dados para os gráficos principais
 genre_df = count_items(df_1, 'genres').head(12)
 cat_df = count_items(df_1, 'categories').head(12)
 
@@ -73,6 +79,7 @@ for langs in df_1['supported_languages']:
         lang_counts[lang] += 1
 lang_df = pd.DataFrame(lang_counts.items(), columns=['Language', 'Count']).sort_values('Count', ascending=False).head(12)
 
+# Tabs principais
 tab1, tab2, tab3 = st.tabs(["📊 Gráficos", "📁 Tabela Completa", "🔬 Análises Avançadas"])
 
 with tab1:
@@ -92,11 +99,14 @@ with tab2:
 with tab3:
     st.subheader("🔍 Correlações (exemplo básico com gênero x linguagem)")
 
-    df_genres = MultiLabelBinarizer().fit_transform(df_1['genres'].dropna())
-    df_langs = MultiLabelBinarizer().fit_transform(df_1['supported_languages'].dropna())
+    try:
+        df_genres = MultiLabelBinarizer().fit_transform(df_1['genres'].dropna())
+        df_langs = MultiLabelBinarizer().fit_transform(df_1['supported_languages'].dropna())
 
-    if df_genres.shape[0] == df_langs.shape[0]:
-        corr_matrix = np.corrcoef(df_genres.T @ df_langs)
-        st.write("⚠️ Heatmap omitido para evitar poluição visual. Ideal usar Plotly Heatmap interativo filtrável.")
-    else:
-        st.warning("Número de jogos com gêneros e idiomas não está compatível. Corrija ou filtre.")
+        if df_genres.shape[0] == df_langs.shape[0]:
+            corr_matrix = np.corrcoef(df_genres.T @ df_langs)
+            st.write("⚠️ Heatmap omitido para evitar poluição visual. Ideal usar Plotly Heatmap interativo filtrável.")
+        else:
+            st.warning("Número de jogos com gêneros e idiomas não está compatível. Corrija ou filtre.")
+    except Exception as e:
+        st.error(f"Erro ao calcular correlação: {e}")
