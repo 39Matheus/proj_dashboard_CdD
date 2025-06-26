@@ -5,7 +5,6 @@ import plotly.express as px
 from collections import defaultdict
 import re
 from html import unescape
-import gdown
 from sklearn.preprocessing import MultiLabelBinarizer
 
 # URL raw do arquivo JSON no repositório GitHub
