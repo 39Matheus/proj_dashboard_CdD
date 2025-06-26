@@ -17,9 +17,6 @@ DATA = pd.read_json(url).transpose().rename_axis('AppID').reset_index()
 st.set_page_config(layout="wide", page_title="Análise de Jogos Steam")
 st.title("🎮 Dashboard de Análise de Jogos da Steam")
 
-# Leitura dos dados
-DATA = pd.read_json(output).transpose().rename_axis('AppID').reset_index()
-
 # Seleção de colunas úteis
 filtro_col = [
     'name', 'release_date', 'price', 'dlc_count', 'windows', 'mac', 'linux',
