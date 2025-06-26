@@ -1,3 +1,4 @@
+import os
 import gdown
 import streamlit as st
 import pandas as pd
@@ -9,18 +10,22 @@ import re
 from html import unescape
 from sklearn.preprocessing import MultiLabelBinarizer
 
+# URL do Google Drive (compartilhado publicamente)
 file_id = "1uF1nhyZ7ghk9flT2uuCgTRz70gCMpyx0"
 url = f"https://drive.google.com/uc?id={file_id}"
+output = "games.json"
 
+# Baixar apenas se não existir
+if not os.path.exists(output):
+    gdown.download(url, output, quiet=False)
 
+# Carregar dados
 st.set_page_config(layout="wide", page_title="Análise de Jogos Steam")
 st.title("🎮 Dashboard de Análise de Jogos da Steam")
 
-output = "games.json"
-gdown.download(url, output, quiet=False)
-
 DATA = pd.read_json(output).transpose().rename_axis('AppID').reset_index()
-# Seleção de colunas úteis
+
+# Filtrar colunas úteis
 filtro_col = ['name', 'release_date', 'price', 'dlc_count', 'windows', 'mac', 'linux',
               'achievements', 'supported_languages', 'developers', 'publishers',
               'categories', 'genres', 'positive', 'negative', 'estimated_owners', 'tags']
