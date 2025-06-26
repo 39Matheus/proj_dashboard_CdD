@@ -1,41 +1,39 @@
-import os
-import gdown
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
 from collections import defaultdict
-import json
 import re
 from html import unescape
+import gdown
 from sklearn.preprocessing import MultiLabelBinarizer
 
-# URL do Google Drive (compartilhado publicamente)
+# Baixar arquivo do Google Drive
 file_id = "1uF1nhyZ7ghk9flT2uuCgTRz70gCMpyx0"
 url = f"https://drive.google.com/uc?id={file_id}"
 output = "games.json"
+gdown.download(url, output, quiet=False)
 
-# Baixar apenas se não existir
-if not os.path.exists(output):
-    gdown.download(url, output, quiet=False)
-
-# Carregar dados
+# Configuração da página
 st.set_page_config(layout="wide", page_title="Análise de Jogos Steam")
 st.title("🎮 Dashboard de Análise de Jogos da Steam")
 
+# Leitura dos dados
 DATA = pd.read_json(output).transpose().rename_axis('AppID').reset_index()
 
-# Filtrar colunas úteis
-filtro_col = ['name', 'release_date', 'price', 'dlc_count', 'windows', 'mac', 'linux',
-              'achievements', 'supported_languages', 'developers', 'publishers',
-              'categories', 'genres', 'positive', 'negative', 'estimated_owners', 'tags']
+# Seleção de colunas úteis
+filtro_col = [
+    'name', 'release_date', 'price', 'dlc_count', 'windows', 'mac', 'linux',
+    'achievements', 'supported_languages', 'developers', 'publishers',
+    'categories', 'genres', 'positive', 'negative', 'estimated_owners', 'tags'
+]
 df_1 = DATA[filtro_col].copy()
 
-# Cria coluna de reviews se ainda não existir
+# Cria coluna de reviews
 if 'reviews' not in df_1.columns:
     df_1.insert(df_1.columns.get_loc('negative') + 1, 'reviews', df_1['positive'] + df_1['negative'])
 
-# Normalização de idiomas
+# Normaliza línguas
 normalization_map = {
     "Slovakian": "Slovak",
     "English (full audio)": "English",
@@ -66,7 +64,7 @@ def normalize_languages(entry):
 
 df_1['supported_languages'] = df_1['supported_languages'].apply(normalize_languages)
 
-# Função para contar categorias/gêneros/etc
+# Contagem de categorias, gêneros e línguas
 def count_items(df, col):
     counts = defaultdict(int)
     for row in df[col]:
@@ -75,7 +73,6 @@ def count_items(df, col):
                 counts[item.lower()] += 1
     return pd.DataFrame(counts.items(), columns=[col.capitalize(), 'Count']).sort_values('Count', ascending=False)
 
-# Dados para os gráficos principais
 genre_df = count_items(df_1, 'genres').head(12)
 cat_df = count_items(df_1, 'categories').head(12)
 
@@ -85,7 +82,7 @@ for langs in df_1['supported_languages']:
         lang_counts[lang] += 1
 lang_df = pd.DataFrame(lang_counts.items(), columns=['Language', 'Count']).sort_values('Count', ascending=False).head(12)
 
-# Tabs principais
+# Interface em abas
 tab1, tab2, tab3 = st.tabs(["📊 Gráficos", "📁 Tabela Completa", "🔬 Análises Avançadas"])
 
 with tab1:
@@ -104,15 +101,12 @@ with tab2:
 
 with tab3:
     st.subheader("🔍 Correlações (exemplo básico com gênero x linguagem)")
-
-    try:
-        df_genres = MultiLabelBinarizer().fit_transform(df_1['genres'].dropna())
-        df_langs = MultiLabelBinarizer().fit_transform(df_1['supported_languages'].dropna())
-
-        if df_genres.shape[0] == df_langs.shape[0]:
-            corr_matrix = np.corrcoef(df_genres.T @ df_langs)
-            st.write("⚠️ Heatmap omitido para evitar poluição visual. Ideal usar Plotly Heatmap interativo filtrável.")
-        else:
-            st.warning("Número de jogos com gêneros e idiomas não está compatível. Corrija ou filtre.")
-    except Exception as e:
-        st.error(f"Erro ao calcular correlação: {e}")
+    
+    df_genres = MultiLabelBinarizer().fit_transform(df_1['genres'].dropna())
+    df_langs = MultiLabelBinarizer().fit_transform(df_1['supported_languages'].dropna())
+    
+    if df_genres.shape[0] == df_langs.shape[0]:
+        corr_matrix = np.corrcoef(df_genres.T @ df_langs)
+        st.write("⚠️ Heatmap omitido para evitar poluição visual. Ideal usar Plotly Heatmap interativo filtrável.")
+    else:
+        st.warning("Número de jogos com gêneros e idiomas não está compatível. Corrija ou filtre.")
