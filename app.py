@@ -19,12 +19,10 @@ import gdown
 file_path = "games_reduzido.json.gz"
 
 # Verifica se já existe o arquivo reduzido
-if not os.path.exists(file_path):
-    st.warning("Arquivo reduzido não encontrado. Baixando o original e processando...")
-    # ID do Google Drive do arquivo completo (590 MB)
-    file_id = "1uF1nhyZ7ghk9flT2uuCgTRz70gCMpyx0"
-    url = f"https://drive.google.com/uc?id={file_id}"
-    gdown.download(url, "games.json", quiet=False)
+df_1 = pd.read_json("games.json.gz", orient="records", lines=True, compression="gzip")
+#file_id = "1uF1nhyZ7ghk9flT2uuCgTRz70gCMpyx0"
+#url = f"https://drive.google.com/uc?id={file_id}"
+#gdown.download(url, "games.json", quiet=False)
 
     # Lê e reduz as colunas do JSON
     with st.spinner("Processando JSON..."):
