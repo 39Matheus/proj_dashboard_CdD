@@ -1,6 +1,6 @@
 import streamlit as st
-from .data_loader import download_and_prepare_data
-from .tabs import tab1, tab2, tab3, tab4, tab5
+from data_loader import download_and_prepare_data
+from tabs import tab1, tab2, tab3, tab4, tab5
 import pandas as pd
 
 st.set_page_config(layout="wide", page_title="Steam Dashboard")
